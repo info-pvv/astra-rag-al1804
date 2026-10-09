@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAG по курсу AL-1804 — Astra Linux SE 1.8</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#161c2b; --panel2:#1c2436; --line:#2a3348;
+    --txt:#e6ebf5; --dim:#94a3b8; --acc:#4d9fff; --acc2:#2f7fe0;
+    --ok:#33c48d; --warn:#e0a33a; --bad:#e0604d; --code:#0b101a;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;font:15px/1.55 "Segoe UI",Roboto,Arial,sans-serif;
+    background:linear-gradient(180deg,#0d121d,#0f1420 40%);color:var(--txt);
+    min-height:100vh;
+  }
+  header{
+    padding:22px 28px 16px;border-bottom:1px solid var(--line);
+    background:rgba(20,26,40,.75);position:sticky;top:0;z-index:10;
+    backdrop-filter:blur(8px);
+  }
+  h1{margin:0;font-size:19px;letter-spacing:.2px}
+  .sub{color:var(--dim);font-size:13px;margin-top:4px}
+  .badge{
+    display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;
+    background:#1e2b45;border:1px solid var(--line);color:var(--dim);
+    margin-left:8px;vertical-align:middle;
+  }
+  main{max-width:1000px;margin:0 auto;padding:24px 28px 80px}
+  .tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+  .tab{
+    padding:9px 18px;border-radius:10px;border:1px solid var(--line);
+    background:var(--panel);color:var(--dim);cursor:pointer;font-size:14px;
+    transition:.15s;
+  }
+  .tab:hover{border-color:#3a4763;color:var(--txt)}
+  .tab.active{background:var(--acc2);border-color:var(--acc2);color:#fff;font-weight:600}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:20px;margin-bottom:18px;
+  }
+  label{display:block;font-size:13px;color:var(--dim);margin-bottom:7px}
+  textarea,input[type=text],input[type=number]{
+    width:100%;background:var(--code);border:1px solid var(--line);color:var(--txt);
+    border-radius:10px;padding:12px 14px;font:14px/1.5 inherit;resize:vertical;
+    outline:none;transition:.15s;
+  }
+  textarea:focus,input:focus{border-color:var(--acc)}
+  textarea{min-height:74px}
+  .row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-top:14px}
+  .grow{flex:1 1 220px}
+  button{
+    padding:11px 22px;border-radius:10px;border:none;cursor:pointer;font-size:14px;
+    font-weight:600;background:var(--acc2);color:#fff;transition:.15s;
+  }
+  button:hover:not(:disabled){background:var(--acc)}
+  button:disabled{opacity:.55;cursor:default}
+  button.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--dim)}
+  button.ghost:hover{background:#232d43;color:var(--txt)}
+  button.mini{padding:7px 13px;font-size:13px;font-weight:500}
+  .opt-row{display:flex;gap:10px;align-items:center;margin-bottom:9px}
+  .opt-k{
+    width:26px;height:26px;flex:0 0 26px;border-radius:50%;background:var(--panel2);
+    border:1px solid var(--line);display:grid;place-items:center;font-size:12px;
+    color:var(--dim);
+  }
+  .opt-k.correct{background:var(--ok);border-color:var(--ok);color:#06281c;font-weight:700}
+  .opt-k.wrong{background:var(--panel2);border-color:var(--bad);color:var(--bad)}
+  .src{
+    background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--acc);
+    border-radius:10px;padding:13px 15px;margin-bottom:11px;
+  }
+  .src .meta{font-size:12.5px;color:var(--dim);margin-bottom:7px}
+  .src .meta b{color:var(--acc);font-weight:600}
+  .src .txt{font-size:14px;color:#d5deee;white-space:pre-wrap}
+  .ans-item{
+    background:var(--code);border:1px solid var(--line);border-radius:10px;
+    padding:12px 14px;margin-bottom:10px;font-size:14.5px;
+  }
+  .ans-item .cite{font-size:12px;color:var(--dim);margin-top:7px}
+  .ans-item .cite a{color:var(--acc);text-decoration:none;cursor:pointer}
+  .ans-item .cite a:hover{text-decoration:underline}
+  .note{
+    background:#241f14;border:1px solid #4a3c1d;color:#e2c07a;border-radius:10px;
+    padding:11px 14px;font-size:13.5px;margin-bottom:14px;
+  }
+  .verdict{
+    border-radius:12px;padding:16px 18px;margin-bottom:16px;border:1px solid;
+  }
+  .verdict.ok{background:#10281f;border-color:#1f5c45}
+  .verdict.mid{background:#262213;border-color:#5c4a1f}
+  .verdict.low{background:#291a18;border-color:#5c2f28}
+  .verdict h3{margin:0 0 6px;font-size:15px}
+  .verdict .big{font-size:17px;font-weight:600;margin:8px 0 4px}
+  .bar{height:7px;background:var(--panel2);border-radius:99px;overflow:hidden;margin-top:6px}
+  .bar > i{display:block;height:100%;background:var(--acc);border-radius:99px}
+  .muted{color:var(--dim);font-size:13px}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid #ffffff55;
+    border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;
+    vertical-align:-2px;margin-right:7px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .hidden{display:none}
+  table.rank{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:6px}
+  table.rank td{padding:6px 8px;border-bottom:1px solid var(--line)}
+  table.rank td:last-child{text-align:right;color:var(--dim)}
+  footer{color:var(--dim);font-size:12.5px;text-align:center;padding:22px}
+  dialog{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;color:var(--txt);
+    max-width:820px;width:92%;padding:0;
+  }
+  dialog::backdrop{background:#000a}
+  dialog .dh{padding:16px 20px;border-bottom:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;gap:12px}
+  dialog .db{padding:18px 20px;max-height:66vh;overflow:auto;white-space:pre-wrap;
+    font-size:14px;color:#d5deee}
+</style>
+</head>
+<body>
+<header>
+  <h1>RAG-поиск по курсу AL-1804 <span class="badge" id="health">проверка базы…</span></h1>
+  <div class="sub">Сетевое администрирование ОС Astra Linux Special Edition 1.8 · документация 1.8.6 · офлайн, локально</div>
+</header>
+
+<main>
+  <div class="tabs">
+    <button class="tab active" data-tab="ask">Вопрос по курсу</button>
+    <button class="tab" data-tab="quiz">Тест с выбором ответа</button>
+    <button class="tab" data-tab="docs">Документация (PDF)</button>
+  </div>
+
+  <!-- ============================= РЕЖИМ: ВОПРОС ============================= -->
+  <section id="tab-ask">
+    <div class="card">
+      <label for="q">Ваш вопрос по материалам курса</label>
+      <textarea id="q" placeholder="Например: как настроить DNS-сервер BIND? / как создать зону DHCP? / настройка SSH-доступа по ключам?"></textarea>
+      <div class="row">
+        <div class="grow">
+          <label for="k">Сколько фрагментов показать</label>
+          <input type="number" id="k" value="5" min="1" max="15" style="width:110px">
+        </div>
+        <button id="askBtn">Найти ответ</button>
+        <button class="ghost mini" id="askClear">Очистить</button>
+      </div>
+    </div>
+    <div id="askOut"></div>
+  </section>
+
+  <!-- ============================== РЕЖИМ: ТЕСТ ============================== -->
+  <section id="tab-quiz" class="hidden">
+    <div class="card">
+      <label for="qq">Вопрос теста</label>
+      <textarea id="qq" placeholder="Например: какая команда создаёт логический том LVM?" style="min-height:60px"></textarea>
+
+      <label style="margin-top:16px">Варианты ответа (2–6). Отметьте один как правильный — или оставьте всё системе.</label>
+      <div id="opts"></div>
+
+      <div class="row">
+        <button class="ghost mini" id="addOpt">+ вариант</button>
+        <button class="ghost mini" id="delOpt">− вариант</button>
+        <span class="muted" id="optHint"></span>
+        <div class="grow"></div>
+        <button id="quizBtn">Определить ответ</button>
+        <button class="ghost mini" id="quizClear">Очистить</button>
+      </div>
+      <div class="muted" style="margin-top:10px">
+        Система найдёт в документации подтверждение каждому варианту и укажет тот,
+        который лучше всего подтверждается. Если вы знаете правильный ответ —
+        отметьте его галочкой, и результат сравнится с вашим выбором.
+      </div>
+    </div>
+    <div id="quizOut"></div>
+  </section>
+
+  <!-- ============================ РЕЖИМ: ДОКУМЕНТЫ ============================ -->
+  <section id="tab-docs" class="hidden">
+    <div class="card">
+      <div class="muted" style="margin-bottom:12px">Полный комплект документации курса. PDF открываются прямо в браузере.</div>
+      <div id="docsList" class="muted">Загрузка списка…</div>
+    </div>
+  </section>
+</main>
+
+  <footer>Локальная база <code>kb.sqlite</code> · сервер слушает только 127.0.0.1</footer>
+
+<dialog id="dlg">
+  <div class="dh">
+    <b id="dlgTitle">Фрагмент документа</b>
+    <div style="display:flex;gap:8px">
+      <button class="ghost mini" id="dlgLlm">🤖 Спросить нейросеть</button>
+      <button class="ghost mini" id="dlgCopy">📋 Копировать</button>
+      <button class="ghost mini" onclick="document.getElementById('dlg').close()">Закрыть</button>
+    </div>
+  </div>
+  <div class="db" id="dlgBody"></div>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => (s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const pages = (a, b) => a === b ? `стр. ${a}` : `стр. ${a}–${b}`;
+
+/* -------------------------------- вкладки -------------------------------- */
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+  t.classList.add("active");
+  $("#tab-ask").classList.toggle("hidden", t.dataset.tab !== "ask");
+  $("#tab-quiz").classList.toggle("hidden", t.dataset.tab !== "quiz");
+  $("#tab-docs").classList.toggle("hidden", t.dataset.tab !== "docs");
+});
+
+/* ------------------------- список PDF-документации ------------------------- */
+let PDF_LIST = {};
+fetch("/api/pdfs").then(r => r.json()).then(d => {
+  PDF_LIST = d.pdfs || {};
+  const box = $("#docsList");
+  const names = Object.keys(PDF_LIST);
+  if (!names.length) {
+    box.textContent = "PDF-файлы на сервер не загружены — доступны только текстовые фрагменты.";
+    return;
+  }
+  box.innerHTML = names.map(f =>
+    `<div class="src" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <div><b style="color:var(--txt)">${esc(PDF_LIST[f].title || f)}</b>
+        <div class="muted" style="font-size:12px">${f} · ~${PDF_LIST[f].size_mb} МБ</div></div>
+      <a href="/pdf?f=${encodeURIComponent(f)}" target="_blank"
+         style="color:var(--acc);text-decoration:none;white-space:nowrap">Открыть PDF →</a>
+    </div>`).join("");
+}).catch(() => {});
+
+function pdfLink(doc) {
+  if (PDF_LIST[doc]) return ` <a style="color:var(--acc);cursor:pointer;text-decoration:none"
+    href="/pdf?f=${encodeURIComponent(doc)}" target="_blank">[PDF]</a>`;
+  return "";
+}
+
+/* --------------------- промпт для внешней нейросети ---------------------- */
+let lastAsk = null, lastQuiz = null;
+
+function showLlmPrompt(text) {
+  const dlg = $("#dlg");
+  $("#dlgTitle").textContent = "Запрос для нейросети — вставьте в DeepSeek / ChatGPT / GigaChat";
+  $("#dlgBody").textContent = text;
+  dlg.showModal();
+}
+
+$( "#dlgCopy").onclick = async () => {
+  const t = $("#dlgBody").textContent;
+  try {
+    await navigator.clipboard.writeText(t);
+    flashCopy("Скопировано ✓");
+  } catch (e) {
+    // запасной способ (не-https контекст)
+    const ta = document.createElement("textarea");
+    ta.value = t; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); flashCopy("Скопировано ✓"); }
+    catch (e2) { flashCopy("Скопируйте вручную (Ctrl+C)"); }
+    ta.remove();
+  }
+};
+function flashCopy(msg) {
+  const b = $("#dlgCopy"); const old = b.textContent;
+  b.textContent = msg; setTimeout(() => b.textContent = old, 1600);
+}
+
+$("#dlgLlm").onclick = async () => {
+  const btn = $("#dlgLlm");
+  const body = $("#dlgBody");
+  const prompt = body.textContent;
+  const old = btn.textContent;
+  btn.disabled = true; btn.textContent = "⏳ Нейросеть думает…";
+  body.textContent = "Отправляю запрос в Groq (Llama 3.3 70B)… обычно 5–20 секунд.";
+  try {
+    const r = await fetch("/api/llm", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({prompt})
+    });
+    const d = await r.json();
+    if (d.answer) {
+      body.textContent = d.answer;
+      $("#dlgTitle").textContent = `Ответ нейросети (${d.model}) — источники в документации указаны как [n]`;
+      btn.textContent = "🔄 Отправить снова";
+    } else {
+      body.textContent = prompt;  // вернуть промпт
+      $("#dlgTitle").textContent = "Запрос для нейросети — вставьте в DeepSeek / ChatGPT";
+      btn.textContent = old;
+      alert(d.error || "Не удалось получить ответ нейросети.");
+    }
+  } catch (e) {
+    body.textContent = prompt;
+    alert("Ошибка сети: " + e);
+    btn.textContent = old;
+  } finally { btn.disabled = false; }
+};
+
+function ctxBlocks(items, maxChars) {
+  let out = "", i = 0;
+  for (const s of items) {
+    const pg = s.page_start === s.page_end ? `стр. ${s.page_start}` : `стр. ${s.page_start}–${s.page_end}`;
+    const sec = s.section ? ` · ${s.section}` : "";
+    out += `[${++i}] ${s.doc}, ${pg}${sec}\n${(s.text || "").slice(0, maxChars)}\n\n`;
+  }
+  return out;
+}
+
+function llmAsk() {
+  if (!lastAsk) return;
+  const d = lastAsk;
+  const ctx = ctxBlocks((d.sources || []).slice(0, 5), 1500);
+  const prompt =
+`Ты — опытный администратор и преподаватель по курсу «Astra Linux Special Edition 1.8». Ответь на вопрос строго на основе приведённых ниже фрагментов официальной документации (источники обозначены [n]). Правила:
+— опирайся только на эти фрагменты; если их недостаточно для полного ответа — честно скажи, чего не хватает;
+— рядом с каждым утверждением указывай источник в виде [n];
+— структурируй ответ: краткий ответ, затем пояснения по шагам с командами;
+— команды и пути файлов приводи точно как в документации.
+
+Вопрос: ${d.query}
+
+Фрагменты документации:
+
+${ctx}`;
+  showLlmPrompt(prompt);
+}
+window.llmAsk = llmAsk;
+
+function llmQuiz() {
+  if (!lastQuiz) return;
+  const d = lastQuiz;
+  const ctx = ctxBlocks((d.evidence || []).slice(0, 4), 1200);
+  const opts = d.options.map((o, i) => `${String.fromCharCode(1040 + i)}) ${o.text}`).join("\n");
+  const prompt =
+`Ты — эксперт по Astra Linux Special Edition 1.8. Дан вопрос с вариантами ответа. На основе ТОЛЬКО приведённых ниже фрагментов официальной документации:
+1) определи правильный вариант;
+2) обоснуй выбор со ссылками на источники [n];
+3) кратко поясни, почему остальные варианты неверны;
+4) если фрагментов недостаточно для уверенного выбора — так и скажи и укажи, какой документ стоит посмотреть.
+
+Вопрос: ${d.question}
+Варианты ответа:
+${opts}
+
+Фрагменты документации:
+
+${ctx}`;
+  showLlmPrompt(prompt);
+}
+window.llmQuiz = llmQuiz;
+
+/* ------------------------------ состояние базы ---------------------------- */
+fetch("/api/health").then(r => r.json()).then(d => {
+  $("#health").textContent = d.ok
+    ? `${d.chunks} фрагм. · ${d.docs} док. · семантика: ${d.vector_search ? "вкл" : "выкл"}`
+    : "база недоступна";
+}).catch(() => $("#health").textContent = "сервер не отвечает");
+
+/* ---------------------------- просмотр страницы --------------------------- */
+async function openPage(doc, page) {
+  const dlg = $("#dlg");
+  $("#dlgTitle").textContent = `${doc}, стр. ${page}`;
+  $("#dlgBody").textContent = "Загрузка…";
+  dlg.showModal();
+  try {
+    const r = await fetch(`/api/page?doc=${encodeURIComponent(doc)}&page=${page}`);
+    const d = await r.json();
+    $("#dlgBody").textContent = d.text || d.error || "Пусто";
+  } catch (e) { $("#dlgBody").textContent = "Не удалось загрузить: " + e; }
+}
+window.openPage = openPage;
+
+/* =============================== РЕЖИМ: ВОПРОС ============================ */
+const askOut = $("#askOut");
+$("#askBtn").onclick = ask;
+$("#q").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) ask(); });
+$("#askClear").onclick = () => { $("#q").value = ""; askOut.innerHTML = ""; };
+
+async function ask() {
+  const query = $("#q").value.trim();
+  if (!query) { alert("Введите вопрос."); return; }
+  const k = parseInt($("#k").value || "5", 10);
+  askOut.innerHTML = `<div class="card"><span class="spin"></span>Поиск по документации…</div>`;
+  const btn = $("#askBtn"); btn.disabled = true;
+  try {
+    const r = await fetch("/api/ask", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({query, k})
+    });
+    const d = await r.json();
+    if (d.error) { askOut.innerHTML = `<div class="note">${esc(d.error)}</div>`; return; }
+    lastAsk = d;
+    renderAnswer(d);
+  } catch (e) {
+    askOut.innerHTML = `<div class="note">Ошибка запроса: ${esc(String(e))}</div>`;
+  } finally { btn.disabled = false; }
+}
+
+function renderAnswer(d) {
+  let h = "";
+  if (d.note) h += `<div class="note">${esc(d.note)}</div>`;
+
+  h += `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
+    <span class="muted">Наиболее релевантные фрагменты по запросу «${esc(d.query)}»:</span>
+    <button class="ghost mini" onclick="llmAsk()">🤖 Запрос для нейросети</button>
+  </div>`;
+  if (!d.answer || !d.answer.length) {
+    h += `<div class="muted">Подходящих фрагментов не найдено. Попробуйте другие слова.</div>`;
+  } else {
+    d.answer.forEach(a => {
+      h += `<div class="ans-item">${esc(a.text)}
+        <div class="cite">Источник: <a onclick="openPage('${esc(a.doc)}', ${a.page_start})">
+        ${esc(a.doc)}, ${pages(a.page_start, a.page_end)}</a>${pdfLink(a.doc)}
+        ${a.section ? " · " + esc(a.section) : ""}</div></div>`;
+    });
+  }
+  h += `</div>`;
+
+  if (d.sources && d.sources.length) {
+    h += `<div class="card"><div class="muted" style="margin-bottom:11px">
+      Фрагменты базы, из которых собран ответ (нажмите на страницу, чтобы открыть её целиком):</div>`;
+    d.sources.forEach(s => {
+      h += `<div class="src">
+        <div class="meta"><b>${esc(s.doc)}</b> — <a style="color:var(--acc);cursor:pointer"
+          onclick="openPage('${esc(s.doc)}', ${s.page_start})">${pages(s.page_start, s.page_end)}</a>${pdfLink(s.doc)}
+          ${s.section ? " · " + esc(s.section) : ""}</div>
+        <div class="txt">${esc(s.snippet)}</div></div>`;
+    });
+    h += `</div>`;
+  }
+  askOut.innerHTML = h;
+}
+
+/* ================================ РЕЖИМ: ТЕСТ ============================= */
+const optsBox = $("#opts");
+const MAX_OPT = 6, MIN_OPT = 2;
+let optSeq = 0;
+
+function addOption(text = "") {
+  if (optsBox.children.length >= MAX_OPT) return;
+  const i = ++optSeq;
+  const row = document.createElement("div");
+  row.className = "opt-row";
+  row.innerHTML = `
+    <span class="opt-k" data-k>${optsBox.children.length + 1}</span>
+    <input type="text" placeholder="Вариант ${optsBox.children.length + 1}" value="${esc(text)}">
+    <label style="display:flex;align-items:center;gap:5px;margin:0;white-space:nowrap">
+      <input type="radio" name="correct" style="width:auto"> верный</label>
+    <button class="ghost mini" title="Удалить">✕</button>`;
+  row.querySelector("button").onclick = () => { row.remove(); renumber(); };
+  row.querySelector("input[type=radio]").onchange = renumber;
+  optsBox.appendChild(row);
+  renumber();
+}
+
+function renumber() {
+  [...optsBox.children].forEach((r, i) => {
+    r.querySelector("[data-k]").textContent = i + 1;
+    r.querySelector("input[type=text]").placeholder = "Вариант " + (i + 1);
+  });
+  $("#delOpt").disabled = optsBox.children.length <= MIN_OPT;
+  $("#addOpt").disabled = optsBox.children.length >= MAX_OPT;
+  const marked = [...optsBox.querySelectorAll("input[type=radio]")].find(r => r.checked);
+  $("#optHint").textContent = marked
+    ? "Отмечен верный вариант — сверим с документацией."
+    : "Отметьте верный вариант или оставьте определение системе.";
+}
+
+$("#addOpt").onclick = () => addOption();
+$("#delOpt").onclick = () => { if (optsBox.children.length > MIN_OPT) { optsBox.lastElementChild.remove(); renumber(); } };
+$("#qq").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) runQuiz(); });
+$("#quizClear").onclick = () => {
+  $("#qq").value = ""; optsBox.innerHTML = ""; optSeq = 0;
+  addOption(); addOption(); $("#quizOut").innerHTML = "";
+};
+$("#quizBtn").onclick = runQuiz;
+
+async function runQuiz() {
+  const question = $("#qq").value.trim();
+  const rows = [...optsBox.children];
+  const options = rows.map(r => r.querySelector("input[type=text]").value.trim());
+  const markedIdx = rows.findIndex(r => r.querySelector("input[type=radio]").checked);
+
+  if (!question) { alert("Введите вопрос теста."); return; }
+  if (options.filter(Boolean).length < MIN_OPT) { alert("Нужно минимум два варианта ответа."); return; }
+  if (options.some(o => !o)) { alert("Заполните все варианты ответа."); return; }
+
+  const out = $("#quizOut");
+  out.innerHTML = `<div class="card"><span class="spin"></span>Проверка вариантов по документации…</div>`;
+  const btn = $("#quizBtn"); btn.disabled = true;
+  try {
+    const r = await fetch("/api/quiz", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({question, options})
+    });
+    const d = await r.json();
+    if (d.error) { out.innerHTML = `<div class="note">${esc(d.error)}</div>`; return; }
+    lastQuiz = d;
+    renderQuiz(d, markedIdx);
+  } catch (e) {
+    out.innerHTML = `<div class="note">Ошибка запроса: ${esc(String(e))}</div>`;
+  } finally { btn.disabled = false; }
+}
+
+function renderQuiz(d, markedIdx) {
+  const ok = d.confidence === "высокая" ? "ok" : d.confidence === "средняя" ? "mid" : "low";
+  const mark = d.options[d.answer_index];
+  let h = `<div class="verdict ${ok}">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <h3 style="margin:0">Уверенность: ${esc(d.confidence)} <span class="muted">(отрыв: ${d.margin})</span></h3>
+      <button class="ghost mini" onclick="llmQuiz()">🤖 Запрос для нейросети</button>
+    </div>
+    <div class="muted">Подтверждается документацией:</div>
+    <div class="big">${esc(mark.text)}</div>`;
+
+  if (markedIdx >= 0) {
+    const user = d.options[markedIdx];
+    if (user.is_answer) h += `<div style="color:var(--ok);margin-top:8px">✔ Ваш отмеченный вариант совпал с определённым по документации.</div>`;
+    else h += `<div style="color:var(--warn);margin-top:8px">⚠ Вы отметили «${esc(user.text)}» — по документации лучше подтверждается другой вариант.</div>`;
+  }
+  h += `</div>`;
+
+  h += `<div class="card"><div class="muted" style="margin-bottom:12px">Оценка поддержки каждого варианта документацией<br>
+    (0 = минимум по этому вопросу, 1 = максимум; «общая» — сводная оценка поиска и семантики):</div>`;
+  d.options.forEach(o => {
+    const cls = o.is_answer ? "correct" : "";
+    const w = Math.round((o.combined || 0) * 100);
+    h += `<div style="margin-bottom:13px">
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="opt-k ${cls}">${o.is_answer ? "✓" : (o.index + 1)}</span>
+        <span style="flex:1">${esc(o.text)}</span>
+        <span class="muted">общая ${o.combined}</span>
+      </div>
+      <div class="bar" style="margin-left:36px"><i style="width:${w}%"></i></div>
+    </div>`;
+  });
+  h += `<table class="rank">`;
+  d.ranking.forEach((idx, pos) => {
+    const o = d.options[idx];
+    h += `<tr><td>${pos + 1}. ${esc(o.text)}</td>
+      <td>поиск ${o.fts} · семантика ${o.vec}</td></tr>`;
+  });
+  h += `</table></div>`;
+
+  if (d.quotes && d.quotes.length) {
+    h += `<div class="card"><div class="muted" style="margin-bottom:11px">Цитаты из документации, подтверждающие ответ:</div>`;
+    d.quotes.forEach(q => {
+      h += `<div class="ans-item">${esc(q.text)}
+        <div class="cite">Источник: <a onclick="openPage('${esc(q.doc)}', ${q.page_start})">
+        ${esc(q.doc)}, ${pages(q.page_start, q.page_end)}</a>${pdfLink(q.doc)}
+        ${q.section ? " · " + esc(q.section) : ""}</div></div>`;
+    });
+    h += `</div>`;
+  }
+
+  if (d.evidence && d.evidence.length) {
+    h += `<div class="card"><div class="muted" style="margin-bottom:11px">Найденные фрагменты базы:</div>`;
+    d.evidence.forEach(e => {
+      h += `<div class="src">
+        <div class="meta"><b>${esc(e.doc)}</b> — <a style="color:var(--acc);cursor:pointer"
+          onclick="openPage('${esc(e.doc)}', ${e.page_start})">${pages(e.page_start, e.page_end)}</a>${pdfLink(e.doc)}
+          ${e.section ? " · " + esc(e.section) : ""}</div>
+        <div class="txt">${esc(e.snippet)}</div></div>`;
+    });
+    h += `</div>`;
+  }
+  $("#quizOut").innerHTML = h;
+}
+
+/* ------------------------------ инициализация ----------------------------- */
+addOption(); addOption();
+renumber();
+</script>
+</body>
+</html>
